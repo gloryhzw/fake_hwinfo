@@ -18,7 +18,7 @@ It is particularly useful for:
 *   **Python API (`fake_hwinfo_api.py`)**: A clean, object-oriented API to define Sensors and Entries (Temp, Fan, Voltage, etc.) and update them programmatically.
 *   **CLI Client (`read_hwinfo.py`)**: A simple tool to verify data is being exposed correctly.
 *   **GUI Client (`gui_client.py`)**: A visual dashboard to see the values in real-time.
-*   **Compatibility Tools**: Includes scripts to trick detection mechanisms (`fake_window.py`, `setup_registry.py`).
+*   **Compatibility Tools**: Includes a script (`setup_registry.py`) and a dummy executable to trick detection mechanisms.
 
 ## Prerequisites
 
@@ -45,18 +45,13 @@ To run the included demo which generates sine-wave temperature and fan speed dat
     ```
     *This sets `SupportSharedMemory = 1` in the registry, which some apps check.*
 
-2.  **Start the Fake Window** (Required for Aquasuite):
-    ```powershell
-    start /B python fake_window.py
-    ```
-    *Creates a hidden window with class `HWiNFO64`, satisfying `FindWindow` checks.*
-
-3.  **Start the Fake Sensor**:
+2.  **Start the Fake Sensor**:
     ```powershell
     python fake_hwinfo.py
     ```
+    *This will also start a dummy `HWiNFO64.exe` process if it exists in the `dist` folder.*
 
-4.  **Verify**:
+3.  **Verify**:
     *   Run `python gui_client.py` to see the data.
     *   Open your target app (e.g., Aquasuite). It should detect "Aquasuite Fake Sensor".
 
@@ -122,9 +117,37 @@ finally:
 *   **"Access Denied" or Error 5**: Run your terminal/IDE as **Administrator**.
 *   **"Real HWiNFO64 detected"**: The script checks if the memory block already exists and has many sensors. Close the real HWiNFO64.
 *   **Aquasuite doesn't see the sensor**:
-    *   Ensure `fake_window.py` is running.
-    *   Ensure a process named `HWiNFO64.exe` is running (you can rename `cmd.exe` to `HWiNFO64.exe` and leave it open if the fake window isn't enough).
+    *   Ensure a process named `HWiNFO64.exe` is running. A dummy executable can be created for this purpose. See the "Creating a Dummy HWiNFO64.exe" section for more details.
     *   Restart the Aquasuite background service.
+
+## Creating a Dummy HWiNFO64.exe
+
+Some applications, like Aquasuite, check for a running process named `HWiNFO64.exe`. To satisfy this check, you can create a dummy executable that does nothing but run indefinitely.
+
+1.  **Install PyInstaller**:
+    ```bash
+    pip install pyinstaller
+    ```
+
+2.  **Create a simple Python script** named `dummy_hwinfo.py`:
+    ```python
+    import time
+
+    while True:
+        time.sleep(999999)
+    ```
+
+3.  **Compile the script** into a single executable:
+    ```bash
+    pyinstaller --onefile --noconsole dummy_hwinfo.py
+    ```
+
+4.  **Rename the executable**:
+    *   The compiled executable will be in the `dist` folder.
+    *   Rename `dummy_hwinfo.exe` to `HWiNFO64.exe`.
+
+5.  **Run the dummy executable** before starting the fake sensor.
+
 
 ## Files
 
@@ -132,7 +155,6 @@ finally:
 *   `fake_hwinfo.py`: A demo implementation using the library.
 *   `read_hwinfo.py`: CLI reader for debugging.
 *   `gui_client.py`: GUI reader for debugging.
-*   `fake_window.py`: Window class emulator.
 *   `setup_registry.py`: Registry helper.
 *   `hwinfo_common.py`: C-struct definitions.
 
