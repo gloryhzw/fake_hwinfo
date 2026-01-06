@@ -49,7 +49,7 @@ To run the included demo which generates sine-wave temperature and fan speed dat
     ```powershell
     python fake_hwinfo.py
     ```
-    *This will also start a dummy `HWiNFO64.exe` process if it exists in the `dist` folder.*
+    *This will automatically start the dummy `HWiNFO64.exe` process if it exists in the project folder.*
 
 3.  **Verify**:
     *   Run `python gui_client.py` to see the data.
@@ -117,12 +117,12 @@ finally:
 *   **"Access Denied" or Error 5**: Run your terminal/IDE as **Administrator**.
 *   **"Real HWiNFO64 detected"**: The script checks if the memory block already exists and has many sensors. Close the real HWiNFO64.
 *   **Aquasuite doesn't see the sensor**:
-    *   Ensure a process named `HWiNFO64.exe` is running. A dummy executable can be created for this purpose. See the "Creating a Dummy HWiNFO64.exe" section for more details.
+    *   Ensure a process named `HWiNFO64.exe` is running. The script handles this automatically if you've created the dummy executable. See the next section for details.
     *   Restart the Aquasuite background service.
 
 ## Creating a Dummy HWiNFO64.exe
 
-Some applications, like Aquasuite, check for a running process named `HWiNFO64.exe`. To satisfy this check, you can create a dummy executable that does nothing but run indefinitely.
+Some applications, like Aquasuite, check for a running process named `HWiNFO64.exe`. The `fake_hwinfo_api.py` script will automatically run this executable if it's found in the project's root directory.
 
 1.  **Install PyInstaller**:
     ```bash
@@ -142,11 +142,12 @@ Some applications, like Aquasuite, check for a running process named `HWiNFO64.e
     pyinstaller --onefile --noconsole dummy_hwinfo.py
     ```
 
-4.  **Rename the executable**:
+4.  **Move and Rename the executable**:
     *   The compiled executable will be in the `dist` folder.
-    *   Rename `dummy_hwinfo.exe` to `HWiNFO64.exe`.
+    *   Move `dummy_hwinfo.exe` from the `dist` folder to the project's root folder.
+    *   Rename it to `HWiNFO64.exe`.
 
-5.  **Run the dummy executable** before starting the fake sensor.
+> **Note on PyInstaller**: PyInstaller's `--onefile` executables work by creating a temporary folder and launching a child process. You may see two `HWiNFO64.exe` processes running. This is normal. The script is configured to terminate the entire process tree on exit, so no orphaned processes will be left.
 
 
 ## Files

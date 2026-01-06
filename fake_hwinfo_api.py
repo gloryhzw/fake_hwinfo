@@ -243,8 +243,9 @@ class FakeHWiNFO:
             self._kernel32.ReleaseMutex(self.mutex_handle)
 
     def close(self):
+        print("Closing Fake HWiNFO Interface...")
         self.is_active = False
-        
+
         # Terminate dummy process and its children for robustness
         try:
             # Using taskkill with /T is more reliable for ensuring all instances are terminated
@@ -254,23 +255,33 @@ class FakeHWiNFO:
             # Ignore if the process doesn't exist or taskkill is not found
             pass
 
-        if self.map_addr:
-            # Zero out the header to invalidate it for other processes
-            try:
-                header_size = ctypes.sizeof(HWiNFOHeader)
-                ctypes.memset(self.map_addr, 0, header_size)
-                print("Shared memory header wiped.")
-            except Exception as e:
-                print(f"Could not wipe shared memory header: {e}")
-            
-            self._kernel32.UnmapViewOfFile(self.map_addr)
-            self.map_addr = None
-        if self.mapping_handle:
-            self._kernel32.CloseHandle(self.mapping_handle)
-            self.mapping_handle = None
+        # Release mutex and close handles in the correct order
         if self.mutex_handle:
-            self._kernel32.CloseHandle(self.mutex_handle)
-            self.mutex_handle = None
+            try:
+                self._kernel32.ReleaseMutex(self.mutex_handle)
+                self._kernel32.CloseHandle(self.mutex_handle)
+                self.mutex_handle = None
+                print("Mutex released and closed.")
+            except Exception as e:
+                print(f"Error closing mutex: {e}")
+
+        if self.map_addr:
+            try:
+                self._kernel32.UnmapViewOfFile(self.map_addr)
+                self.map_addr = None
+                print("Shared memory view unmapped.")
+            except Exception as e:
+                print(f"Error unmapping view: {e}")
+
+        if self.mapping_handle:
+            try:
+                self._kernel32.CloseHandle(self.mapping_handle)
+                self.mapping_handle = None
+                print("Mapping handle closed.")
+            except Exception as e:
+                print(f"Error closing mapping handle: {e}")
+        
+        print("Cleanup complete.")
 
     def __enter__(self):
         return self
