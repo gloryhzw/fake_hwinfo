@@ -1,5 +1,7 @@
 import ctypes
 import time
+import subprocess
+import os
 from ctypes import wintypes
 from hwinfo_common import (
     HWiNFOHeader, HWiNFOSensor, HWiNFOEntry,
@@ -88,14 +90,33 @@ class FakeHWiNFO:
         self.header = None
         self._kernel32 = ctypes.windll.kernel32
         self.is_active = False
+        self.dummy_process = None
 
     def add_sensor(self, id, name, sensor_type=5, instance=1):
         sensor = FakeSensor(id, name, sensor_type, instance)
         self.sensors.append(sensor)
         return sensor
 
+    def _start_dummy_process(self):
+        dummy_exe_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dist", "HWiNFO64.exe")
+        if os.path.exists(dummy_exe_path):
+            try:
+                self.dummy_process = subprocess.Popen(dummy_exe_path)
+                print(f"Started dummy HWiNFO64.exe process (PID: {self.dummy_process.pid})")
+            except Exception as e:
+                print(f"Failed to start dummy HWiNFO64.exe: {e}")
+
     def create(self):
         """Creates the Shared Memory and populates the layout."""
+        self._start_dummy_process()
+        # 0. Check for Admin Rights
+        try:
+            is_admin = ctypes.windll.shell32.IsUserAnAdmin()
+        except Exception:
+            is_admin = False
+        if not is_admin:
+            raise PermissionError("Administrator privileges are required to create Global Shared Memory. Please re-run as Administrator.")
+
         # 1. Calculate Layout
         num_sensors = len(self.sensors)
         all_entries = [e for s in self.sensors for e in s.entries]
@@ -129,7 +150,7 @@ class FakeHWiNFO:
         creation_error = ctypes.GetLastError()
 
         if not self.mapping_handle:
-            raise OSError(f"Failed to create file mapping: {creation_error}")
+            raise OSError(f"Failed to create file mapping (Error: {creation_error}). This often requires Administrator privileges.")
 
         MapViewOfFile = self._kernel32.MapViewOfFile
         MapViewOfFile.argtypes = [wintypes.HANDLE, wintypes.DWORD, wintypes.DWORD, wintypes.DWORD, ctypes.c_size_t]
@@ -222,7 +243,18 @@ class FakeHWiNFO:
 
     def close(self):
         self.is_active = False
+        if self.dummy_process:
+            self.dummy_process.terminate()
+            print("Terminated dummy HWiNFO64.exe process")
         if self.map_addr:
+            # Zero out the header to invalidate it for other processes
+            try:
+                header_size = ctypes.sizeof(HWiNFOHeader)
+                ctypes.memset(self.map_addr, 0, header_size)
+                print("Shared memory header wiped.")
+            except Exception as e:
+                print(f"Could not wipe shared memory header: {e}")
+            
             self._kernel32.UnmapViewOfFile(self.map_addr)
             self.map_addr = None
         if self.mapping_handle:
