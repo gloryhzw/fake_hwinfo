@@ -98,10 +98,11 @@ class FakeHWiNFO:
         return sensor
 
     def _start_dummy_process(self):
-        dummy_exe_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dist", "HWiNFO64.exe")
+        dummy_exe_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "HWiNFO64.exe")
         if os.path.exists(dummy_exe_path):
             try:
-                self.dummy_process = subprocess.Popen(dummy_exe_path)
+                # Use CREATE_NO_WINDOW flag to hide the console window if it appears
+                self.dummy_process = subprocess.Popen(dummy_exe_path, creationflags=subprocess.CREATE_NO_WINDOW)
                 print(f"Started dummy HWiNFO64.exe process (PID: {self.dummy_process.pid})")
             except Exception as e:
                 print(f"Failed to start dummy HWiNFO64.exe: {e}")
@@ -243,9 +244,16 @@ class FakeHWiNFO:
 
     def close(self):
         self.is_active = False
-        if self.dummy_process:
-            self.dummy_process.terminate()
-            print("Terminated dummy HWiNFO64.exe process")
+        
+        # Terminate dummy process and its children for robustness
+        try:
+            # Using taskkill with /T is more reliable for ensuring all instances are terminated
+            subprocess.run(["taskkill", "/F", "/IM", "HWiNFO64.exe", "/T"], check=True, capture_output=True)
+            print("Terminated dummy HWiNFO64.exe process tree.")
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            # Ignore if the process doesn't exist or taskkill is not found
+            pass
+
         if self.map_addr:
             # Zero out the header to invalidate it for other processes
             try:
